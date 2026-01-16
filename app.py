@@ -52,7 +52,8 @@ swagger_template = {
         "description": "API documentation for Analytics Backend",
         "version": "1.0.0"
     },
-    "host": f"{HOST}:{PORT}",
+    # Vercel handles host automatically - don't specify it here
+    # "host" is omitted to let Vercel use the actual deployment URL
     "basePath": "/",
 }
 

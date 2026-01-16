@@ -5,7 +5,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Server Configuration
-HOST = os.getenv('HOST', '127.0.0.1')
+# Vercel doesn't use HOST/PORT - it handles routing automatically
+# Using 0.0.0.0 allows connections from any IP (needed for Vercel)
+HOST = os.getenv('HOST', '0.0.0.0')
+# Vercel will handle the port, but we keep this for local dev
 PORT = int(os.getenv('PORT', 5000))
 
 # Environment Configuration
