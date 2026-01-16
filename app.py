@@ -1,9 +1,9 @@
 from flask import Flask
 from flask_cors import CORS
 from flasgger import Swagger
-from config import HOST, PORT, DEBUG
+from core.config import HOST, PORT, DEBUG
 from routes import register_routes
-from db import init_db, create_indexes
+from core.db import init_db, create_indexes
 
 app = Flask(__name__)
 

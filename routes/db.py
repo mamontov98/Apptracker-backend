@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify
 from datetime import datetime
-from db import get_db
+from core.db import get_db
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, WriteError
-from config import MONGO_DB_NAME
+from core.config import MONGO_DB_NAME
 
 db_bp = Blueprint('db', __name__)
 

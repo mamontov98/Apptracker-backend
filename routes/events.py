@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from db import get_db
+from core.db import get_db
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, WriteError
 
 events_bp = Blueprint('events', __name__)

@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-from config import (
+from core.config import (
     MONGO_URI,
     MONGO_DB_NAME,
     MONGO_CONNECT_TIMEOUT_MS,
