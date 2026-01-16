@@ -62,6 +62,13 @@ swagger = Swagger(app, config=swagger_config, template=swagger_template)
 # Register all routes
 register_routes(app)
 
+# Root route - redirect to Swagger UI or return API info
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint - redirects to Swagger UI"""
+    from flask import redirect
+    return redirect('/swagger', code=302)
+
 if __name__ == '__main__':
     app.run(host=HOST, port=PORT, debug=DEBUG)
 
