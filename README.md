@@ -191,8 +191,9 @@ The following indexes are automatically created on startup:
 ```
 .
 ├── app.py              # Flask application entry point
-├── config.py           # Configuration management
-├── db.py               # MongoDB connection and indexes
+├── core/               # Core modules
+│   ├── config.py       # Configuration management
+│   └── db.py           # MongoDB connection and indexes
 ├── requirements.txt    # Python dependencies
 ├── routes/
 │   ├── __init__.py     # Route registration
@@ -218,106 +219,6 @@ The following indexes are automatically created on startup:
 | `MONGO_SERVER_SELECTION_TIMEOUT_MS` | Server selection timeout | `5000` |
 
 **Note:** `MONGO_URI` is required in production. In development, it defaults to local MongoDB if not set.
-
-## 🚀 Cloud Deployment
-
-### Deploy to Heroku
-
-1. **Create a Heroku app:**
-   ```bash
-   heroku create your-apptracker-backend
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   heroku config:set ENV=production
-   heroku config:set DEBUG=False
-   heroku config:set MONGO_URI=your_mongodb_atlas_connection_string
-   heroku config:set MONGO_DB_NAME=analytics
-   ```
-
-3. **Deploy:**
-   ```bash
-   git push heroku main
-   ```
-
-4. **Add Procfile:**
-   Create `Procfile` in the root directory:
-   ```
-   web: gunicorn app:app
-   ```
-
-5. **Install gunicorn (add to requirements.txt):**
-   ```
-   gunicorn==21.2.0
-   ```
-
-### Deploy to Railway
-
-1. **Connect your repository to Railway**
-
-2. **Set environment variables in Railway dashboard:**
-   - `ENV=production`
-   - `DEBUG=False`
-   - `MONGO_URI=your_mongodb_atlas_connection_string`
-   - `MONGO_DB_NAME=analytics`
-   - `PORT` (Railway sets this automatically)
-
-3. **Railway will auto-detect Python and deploy**
-
-### Deploy to Render
-
-1. **Create a new Web Service on Render**
-
-2. **Connect your repository**
-
-3. **Configure:**
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn app:app`
-
-4. **Set environment variables:**
-   - `ENV=production`
-   - `DEBUG=False`
-   - `MONGO_URI=your_mongodb_atlas_connection_string`
-   - `MONGO_DB_NAME=analytics`
-
-### Deploy to AWS (Elastic Beanstalk)
-
-1. **Install EB CLI:**
-   ```bash
-   pip install awsebcli
-   ```
-
-2. **Initialize:**
-   ```bash
-   eb init -p python-3.11 apptracker-backend
-   ```
-
-3. **Set environment variables:**
-   ```bash
-   eb setenv ENV=production DEBUG=False MONGO_URI=your_mongodb_atlas_connection_string
-   ```
-
-4. **Deploy:**
-   ```bash
-   eb create apptracker-backend-env
-   ```
-
-### CORS Configuration for Cloud
-
-Update `app.py` to allow your frontend domain:
-
-```python
-if DEBUG:
-    CORS(app, origins="*")
-else:
-    CORS(app, origins=[
-        "https://your-frontend-domain.com",
-        "http://localhost:5173"  # For local development
-    ])
-```
-
-**Important:** Replace `your-frontend-domain.com` with your actual frontend deployment URL.
 
 ## Error Handling
 
