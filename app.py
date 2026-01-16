@@ -18,10 +18,13 @@ else:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         # Add your production frontend URLs here:
-        # "https://apptracker-dashboard.vercel.app",
-        # "https://apptracker-frontend.netlify.app",
-        # "https://dashboard.apptracker.com",
-    ])
+        "https://apptracker-frontend-gvcqjfrtt-dani-mamontovs-projects.vercel.app",
+        "https://apptracker-frontend.vercel.app",
+        "https://*.vercel.app",
+    ]),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 
 # Initialize MongoDB connection
 init_db()
