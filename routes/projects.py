@@ -143,7 +143,12 @@ def get_projects():
       - in: query
         name: projectKey
         type: string
-        description: Filter by specific project key
+        description: Filter by specific project key (takes priority over name)
+        required: false
+      - in: query
+        name: name
+        type: string
+        description: Filter by project name (only used if projectKey is not provided)
         required: false
     responses:
       200:
@@ -182,15 +187,20 @@ def get_projects():
         # Get query parameters
         limit = request.args.get('limit', type=int)
         project_key = request.args.get('projectKey')
+        name = request.args.get('name')
         
         # Get database and collection
         db = get_db()
         collection = db['projects']
         
-        # Build query - filter by projectKey if provided
+        # Build query - projectKey takes priority over name
         query = {}
         if project_key:
+            # Search by projectKey (priority)
             query["projectKey"] = project_key
+        elif name:
+            # Search by name (only if projectKey is not provided)
+            query["name"] = name
         
         cursor = collection.find(query)
         
