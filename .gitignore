@@ -43,3 +43,6 @@ logs/
 *.temp
 *.bak
 *~
+
+# Documentation
+PRESENTATION.md

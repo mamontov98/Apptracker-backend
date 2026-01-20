@@ -8,7 +8,7 @@ projects_bp = Blueprint('projects', __name__)
 
 
 def generate_project_key():
-    """Generate a unique, short project key"""
+    # Generate a unique, short project key
     # Generate UUID and take first 12 characters
     return uuid.uuid4().hex[:12]
 

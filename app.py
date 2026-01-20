@@ -7,17 +7,14 @@ from core.db import init_db, create_indexes
 
 app = Flask(__name__)
 
-# Enable CORS for frontend and Android
-# Note: Android apps don't use CORS (direct HTTP requests), but we allow all origins in development
-# In production, update this list to include your deployed frontend URLs
+# Enable CORS for frontend 
 if DEBUG:
     CORS(app, origins="*")
 else:
-    # TODO: Update these URLs to match your deployed frontend domains
     CORS(app, origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        # Add your production frontend URLs here:
+        # Add production frontend URLs 
         "https://apptracker-frontend-gvcqjfrtt-dani-mamontovs-projects.vercel.app",
         "https://apptracker-frontend.vercel.app",
         "https://*.vercel.app",
@@ -55,8 +52,6 @@ swagger_template = {
         "description": "API documentation for Analytics Backend",
         "version": "1.0.0"
     },
-    # Vercel handles host automatically - don't specify it here
-    # "host" is omitted to let Vercel use the actual deployment URL
     "basePath": "/",
 }
 
@@ -68,7 +63,7 @@ register_routes(app)
 # Root route - redirect to Swagger UI or return API info
 @app.route('/', methods=['GET'])
 def root():
-    """Root endpoint - redirects to Swagger UI"""
+    # Root endpoint - redirects to Swagger UI
     from flask import redirect
     return redirect('/swagger', code=302)
 
