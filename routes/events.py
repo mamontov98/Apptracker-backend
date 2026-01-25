@@ -57,6 +57,21 @@ def batch_events():
                     type: object
                     description: Additional event properties
                     example: {"page": "/home", "referrer": "google.com"}
+                  processName:
+                    type: string
+                    description: Process/flow name (max 128 chars, required if processId is provided)
+                    example: "checkout"
+                    maxLength: 128
+                  processId:
+                    type: string
+                    description: Unique process instance identifier (max 256 chars, requires processName and processStep)
+                    example: "proc-12345"
+                    maxLength: 256
+                  processStep:
+                    type: string
+                    description: Process step - "START" or "END" (required if processId is provided)
+                    enum: ["START", "END"]
+                    example: "START"
     responses:
       200:
         description: Events processed successfully
@@ -147,6 +162,26 @@ def batch_events():
             if not event_name or not timestamp:
                 continue
             
+            # Validate process fields: if processId exists, processName and processStep must exist
+            process_id = event.get('processId')
+            process_name = event.get('processName')
+            process_step = event.get('processStep')
+            
+            if process_id:
+                # If processId is provided, validate that processName and processStep are also provided
+                if not process_name or not process_step:
+                    continue  # Skip invalid event (missing required process fields)
+                
+                # Validate processStep is "START" or "END"
+                if process_step not in ['START', 'END']:
+                    continue  # Skip invalid processStep
+                
+                # Validate max lengths
+                if len(process_name) > 128:
+                    continue  # Skip if processName too long
+                if len(process_id) > 256:
+                    continue  # Skip if processId too long
+            
             # Create document to insert
             event_doc = {
                 "projectKey": project_key,
@@ -167,6 +202,14 @@ def batch_events():
             
             if 'properties' in event and isinstance(event['properties'], dict):
                 event_doc['properties'] = event['properties']
+            
+            # Add process fields if present
+            if process_name:
+                event_doc['processName'] = process_name
+            if process_id:
+                event_doc['processId'] = process_id
+            if process_step:
+                event_doc['processStep'] = process_step
             
             valid_events.append(event_doc)
         

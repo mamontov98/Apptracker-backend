@@ -1203,6 +1203,152 @@ def events_timeseries_report():
         }), 500
 
 
+def _calculate_user_funnel(events_collection, project_key, clean_steps, from_date, to_date):
+    """Calculate user-based funnel (existing logic - backward compatible)"""
+    # We process events in time order by event timestamp (not receivedAt).
+    pipeline = [
+        {"$match": {
+            "projectKey": project_key,
+            "eventName": {"$in": clean_steps},
+        }},
+        {"$addFields": {
+            "_eventTime": {
+                "$dateFromString": {
+                    "dateString": "$timestamp",
+                    "onError": None,
+                    "onNull": None
+                }
+            }
+        }},
+        # Always ignore events without timestamp for funnel ordering
+        {"$match": {"_eventTime": {"$ne": None}}}
+    ]
+
+    # Apply range if provided
+    if from_date or to_date:
+        match_range = {"_eventTime": {}}
+        if from_date:
+            match_range["_eventTime"]["$gte"] = from_date
+        if to_date:
+            match_range["_eventTime"]["$lte"] = to_date
+        pipeline.append({"$match": match_range})
+
+    pipeline.extend([
+        {"$sort": {"_eventTime": 1}},
+        {"$project": {"eventName": 1, "userId": 1, "anonymousId": 1}}
+    ])
+
+    cursor = events_collection.aggregate(pipeline)
+
+    # For each user, keep "next step index" they need to complete.
+    user_progress = {}  # user_key -> next_step_index
+    step_users_count = [0] * len(clean_steps)
+
+    for event in cursor:
+        # Identify user: prefer userId, fallback to anonymousId
+        user_key = event.get("userId") or event.get("anonymousId")
+        if not user_key:
+            continue
+
+        current_index = user_progress.get(user_key, 0)
+        if current_index >= len(clean_steps):
+            continue  # user already completed all steps
+
+        if event.get("eventName") == clean_steps[current_index]:
+            # User reached the next step in the funnel
+            step_users_count[current_index] += 1
+            user_progress[user_key] = current_index + 1
+
+    # Build response
+    response_steps = []
+    for i, name in enumerate(clean_steps):
+        response_steps.append({
+            "eventName": name,
+            "users": step_users_count[i]
+        })
+
+    return jsonify({
+        "projectKey": project_key,
+        "mode": "USER",
+        "steps": response_steps
+    }), 200
+
+
+def _calculate_process_funnel(events_collection, project_key, clean_steps, process_name, from_date, to_date):
+    """Calculate process-based funnel: groups by processId instead of userId"""
+    # Build pipeline: filter by projectKey, processName, and events with processId
+    pipeline = [
+        {"$match": {
+            "projectKey": project_key,
+            "processName": process_name,
+            "processId": {"$exists": True, "$ne": None},
+            "processStep": {"$exists": True, "$ne": None},
+            "eventName": {"$in": clean_steps},
+        }},
+        {"$addFields": {
+            "_eventTime": {
+                "$dateFromString": {
+                    "dateString": "$timestamp",
+                    "onError": None,
+                    "onNull": None
+                }
+            }
+        }},
+        # Always ignore events without timestamp for funnel ordering
+        {"$match": {"_eventTime": {"$ne": None}}}
+    ]
+
+    # Apply range if provided
+    if from_date or to_date:
+        match_range = {"_eventTime": {}}
+        if from_date:
+            match_range["_eventTime"]["$gte"] = from_date
+        if to_date:
+            match_range["_eventTime"]["$lte"] = to_date
+        pipeline.append({"$match": match_range})
+
+    pipeline.extend([
+        {"$sort": {"_eventTime": 1}},
+        {"$project": {"eventName": 1, "processId": 1}}
+    ])
+
+    cursor = events_collection.aggregate(pipeline)
+
+    # For each processId, keep "next step index" they need to complete.
+    process_progress = {}  # process_id -> next_step_index
+    step_processes_count = [0] * len(clean_steps)
+
+    for event in cursor:
+        process_id = event.get("processId")
+        if not process_id:
+            continue
+
+        current_index = process_progress.get(process_id, 0)
+        if current_index >= len(clean_steps):
+            continue  # process already completed all steps
+
+        if event.get("eventName") == clean_steps[current_index]:
+            # Process reached the next step in the funnel
+            step_processes_count[current_index] += 1
+            process_progress[process_id] = current_index + 1
+
+    # Build response
+    response_steps = []
+    for i, name in enumerate(clean_steps):
+        response_steps.append({
+            "eventName": name,
+            "users": step_processes_count[i]  # Keep "users" field name for compatibility
+        })
+
+    return jsonify({
+        "projectKey": project_key,
+        "mode": "PROCESS",
+        "processName": process_name,
+        "totalProcesses": len(process_progress),  # Additional info
+        "steps": response_steps
+    }), 200
+
+
 @reports_bp.route('/v1/reports/funnel', methods=['POST'])
 def funnel_report():
     """Funnel report - how many users reach each step in order
@@ -1241,6 +1387,15 @@ def funnel_report():
               format: date-time
               description: End date (filters by event timestamp, ISO 8601, optional)
               example: "2025-01-10T00:00:00Z"
+            mode:
+              type: string
+              description: Funnel mode - "USER" (default) or "PROCESS"
+              enum: ["USER", "PROCESS"]
+              example: "USER"
+            processName:
+              type: string
+              description: Process name (required if mode="PROCESS")
+              example: "checkout"
     responses:
       200:
         description: Funnel results
@@ -1250,6 +1405,12 @@ def funnel_report():
             projectKey:
               type: string
               example: aa26419210ab
+            mode:
+              type: string
+              example: "USER"
+            processName:
+              type: string
+              example: "checkout"
             steps:
               type: array
               items:
@@ -1260,6 +1421,7 @@ def funnel_report():
                     example: app_open
                   users:
                     type: integer
+                    description: Number of users/processes reaching this step
                     example: 10
       400:
         description: Invalid request
@@ -1295,10 +1457,21 @@ def funnel_report():
         steps = data.get('steps')
         from_str = data.get('from')
         to_str = data.get('to')
+        mode = data.get('mode', 'USER')  # Default to USER for backward compatibility
+        process_name = data.get('processName')
 
         # Validate projectKey
         if not project_key:
             return jsonify({"error": "projectKey is required"}), 400
+
+        # Validate mode
+        if mode not in ['USER', 'PROCESS']:
+            return jsonify({"error": "mode must be 'USER' or 'PROCESS'"}), 400
+
+        # Validate processName if mode is PROCESS
+        if mode == 'PROCESS':
+            if not process_name or not isinstance(process_name, str) or not process_name.strip():
+                return jsonify({"error": "processName is required when mode='PROCESS'"}), 400
 
         # Validate steps
         if not isinstance(steps, list) or len(steps) < 2:
@@ -1332,72 +1505,16 @@ def funnel_report():
 
         events_collection = db['events']
 
-        # We process events in time order by event timestamp (not receivedAt).
-        pipeline = [
-            {"$match": {
-                "projectKey": project_key,
-                "eventName": {"$in": clean_steps},
-            }},
-            {"$addFields": {
-                "_eventTime": {
-                    "$dateFromString": {
-                        "dateString": "$timestamp",
-                        "onError": None,
-                        "onNull": None
-                    }
-                }
-            }},
-            # Always ignore events without timestamp for funnel ordering
-            {"$match": {"_eventTime": {"$ne": None}}}
-        ]
-
-        # Apply range if provided
-        if from_date or to_date:
-            match_range = {"_eventTime": {}}
-            if from_date:
-                match_range["_eventTime"]["$gte"] = from_date
-            if to_date:
-                match_range["_eventTime"]["$lte"] = to_date
-            pipeline.append({"$match": match_range})
-
-        pipeline.extend([
-            {"$sort": {"_eventTime": 1}},
-            {"$project": {"eventName": 1, "userId": 1, "anonymousId": 1}}
-        ])
-
-        cursor = events_collection.aggregate(pipeline)
-
-        # For each user, keep "next step index" they need to complete.
-        user_progress = {}  # user_key -> next_step_index
-        step_users_count = [0] * len(clean_steps)
-
-        for event in cursor:
-            # Identify user: prefer userId, fallback to anonymousId
-            user_key = event.get("userId") or event.get("anonymousId")
-            if not user_key:
-                continue
-
-            current_index = user_progress.get(user_key, 0)
-            if current_index >= len(clean_steps):
-                continue  # user already completed all steps
-
-            if event.get("eventName") == clean_steps[current_index]:
-                # User reached the next step in the funnel
-                step_users_count[current_index] += 1
-                user_progress[user_key] = current_index + 1
-
-        # Build response
-        response_steps = []
-        for i, name in enumerate(clean_steps):
-            response_steps.append({
-                "eventName": name,
-                "users": step_users_count[i]
-            })
-
-        return jsonify({
-            "projectKey": project_key,
-            "steps": response_steps
-        }), 200
+        if mode == 'PROCESS':
+            # Process-based funnel: group by processId instead of userId
+            return _calculate_process_funnel(
+                events_collection, project_key, clean_steps, process_name, from_date, to_date
+            )
+        else:
+            # User-based funnel: existing logic (backward compatible)
+            return _calculate_user_funnel(
+                events_collection, project_key, clean_steps, from_date, to_date
+            )
 
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
         return jsonify({
