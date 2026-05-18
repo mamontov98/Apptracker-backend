@@ -1,3 +1,4 @@
+import certifi
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from core.config import (
@@ -18,7 +19,8 @@ def init_db():
         _client = MongoClient(
             MONGO_URI,
             connectTimeoutMS=MONGO_CONNECT_TIMEOUT_MS,
-            serverSelectionTimeoutMS=MONGO_SERVER_SELECTION_TIMEOUT_MS
+            serverSelectionTimeoutMS=MONGO_SERVER_SELECTION_TIMEOUT_MS,
+            tlsCAFile=certifi.where()
         )
     return _client
 
